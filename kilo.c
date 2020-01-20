@@ -4,6 +4,8 @@
 #include<stdio.h>
 #include<ctype.h>
 
+#define ctrl(k) ((k) & 0x1f)
+
 struct termios orig_termios;
 
 void die(const char *s)
@@ -45,8 +47,9 @@ int main()
 	//char c;
 	while(1){
 		char c='\0';
-		read(STDIN_FILENO,&c,1);
-		if(c!='q'){
+		if(read(STDIN_FILENO,&c,1)==-1)
+			die("read");
+		if(c!=ctrl('q')){
 			if(iscntrl(c)){
 				printf("%d\r\n",c);
 			}
