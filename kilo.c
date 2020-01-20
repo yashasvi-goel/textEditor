@@ -19,7 +19,7 @@ void enableRawMode(){
 	//ISIG diables ctl+C ctrl-z
 	//IEXTEN disables ctl+v
 	//ICANON disables canonical mode; input isn't altered anymore
-	raw.c_iflag&=~(IXON|ICRNL);//input flags
+	raw.c_iflag&=~(IXON|ICRNL|INPCK|ISTRIP|BRKINT);//input flags
 	//IXON disables ctl+s ctl+q
 	raw.c_oflag&= ~(OPOST);//OPOST disables all post-processing including carriage operator
 
