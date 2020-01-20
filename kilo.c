@@ -21,6 +21,7 @@ void enableRawMode(){
 	//ICANON disables canonical mode; input isn't altered anymore
 	raw.c_iflag&=~(IXON|ICRNL);//input flags
 	//IXON disables ctl+s ctl+q
+	raw.c_oflag&= ~(OPOST);//OPOST disables all post-processing including carriage operator
 
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);//apply the attrs(file,delay,which one);
 }
@@ -29,10 +30,10 @@ int main(){
 	char c;
 	while(read(STDIN_FILENO,&c,1)==1&&c!='q'){
 		if(iscntrl(c)){
-			printf("%d\n",c);
+			printf("%d\r\n",c);
 		}
 		else{
-			printf("%d '%c'",c,c);
+			printf("%d '%c'\r\n",c,c);
 		}
 	}
 	return 0;
