@@ -6,11 +6,20 @@
 
 struct termios orig_termios;
 
-void disableRawMode(){
-	tcsetattr(STDIN_FILENO,TCSAFLUSH,&orig_termios);
+void die(const char *s)
+{
+	perror(s);
+	exit(1);
 }
-void enableRawMode(){
-	tcgetattr(STDIN_FILENO,&orig_termios);//fetch the terminal attr
+void disableRawMode()
+{
+	if(tcsetattr(STDIN_FILENO,TCSAFLUSH,&orig_termios)==-1)
+		die("tcsetattr");
+}
+void enableRawMode()
+{
+	if(tcgetattr(STDIN_FILENO,&orig_termios)==-1)//fetch the terminal attr
+		die("tcgetattr");
 	atexit(disableRawMode);
 	struct termios raw=orig_termios;
 
@@ -27,9 +36,11 @@ void enableRawMode(){
 	raw.c_cc[VTIME]=10;//max time read() waits before returning
 
 
-	tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);//apply the attrs(file,delay,which one);
+	if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw)==-1)//apply the attrs(file,delay,which one)
+		die("tcsetattr");
 }
-int main(){
+int main()
+{
 	enableRawMode();
 	//char c;
 	while(1){
