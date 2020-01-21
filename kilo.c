@@ -8,6 +8,7 @@
 
 #define ctrl(k) ((k) & 0x1f)
 #define str_INIT {NULL,0}
+#define version "0.0.1"
 
 typedef struct editorConfig{
 	int screenRows;
@@ -110,7 +111,24 @@ void drawTildes(strBuffer* ab)//draws tildes
 	int y;
 	for(y=0;y<E.screenRows;y++)
 	{
-		bufAppend(ab,"~",1);
+		if(y==E.screenRows / 3){
+			char welcome[80];
+			int welcomelen = snprintf(welcome, sizeof(welcome),"Kilo editor -- version %s", version);
+			if(welcomelen > E.screenColumns)
+				welcomelen = E.screenColumns;
+			int padding =(E.screenColumns-welcomelen)/2;
+			if(padding){
+				bufAppend(ab,"~",1);
+				padding--;
+			}
+			while(padding--)
+				bufAppend(ab," ",1);
+			bufAppend(ab, welcome, welcomelen);
+		}
+		else{
+			bufAppend(ab,"~",1);
+		}
+		bufAppend(ab,"\x1b[K",3);
 //		write(STDOUT_FILENO,"~",1);
 		if(y<E.screenRows-1)
 			bufAppend(ab,"\r\n",2);
@@ -121,7 +139,7 @@ void clearScreen(int options)
 {
 	strBuffer ab=str_INIT;
 	bufAppend(&ab,"\x1b[?25l",6);
-	bufAppend(&ab,"\x1b[2J",4);
+//	bufAppend(&ab,"\x1b[2J",4);
 	bufAppend(&ab,"\x1b[H",3);
 	if(options==1)
 		drawTildes(&ab);
