@@ -11,6 +11,7 @@
 #define version "0.0.1"
 
 typedef struct editorConfig{
+	int cx,cy;
 	int screenRows;
 	int screenColumns;
 	struct termios orig_termios;
@@ -55,6 +56,8 @@ int getWindowSize(int *rows, int *cols)
   }
 }
 void initEditor(){
+	E.cx=0;
+	E.cy=0;
 	if(getWindowSize(&E.screenRows,&E.screenColumns)==-1)
 		die("Window");
 }
@@ -139,7 +142,8 @@ void clearScreen(int options)
 {
 	strBuffer ab=str_INIT;
 	bufAppend(&ab,"\x1b[?25l",6);
-//	bufAppend(&ab,"\x1b[2J",4);
+	if(options==0)
+		bufAppend(&ab,"\x1b[2J",4);
 	bufAppend(&ab,"\x1b[H",3);
 	if(options==1)
 		drawTildes(&ab);
