@@ -34,6 +34,7 @@ void bufAppend(strBuffer* ab,const char *s,int len){
 struct editorConfig E;
 void clearScreen();
 char readKey();
+void moveCursor(char);
 int cursorPosition(int*,int*);
 void die(const char *s)
 {
@@ -97,7 +98,24 @@ char readKey()//reads input character-by-character
 		if(nread==-1)
 			die("read");
 	}
-	return c;
+	if(c == '\x1b'){
+		char seq[3];
+		if (read(STDIN_FILENO, &seq[0], 1) != 1) return '\x1b';
+		if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b';
+		if (seq[0] == '[')
+		{
+			switch (seq[1]){
+				case 'A': return 'w';
+				case 'B': return 's';
+				case 'C': return 'd';
+				case 'D': return 'a';
+			}
+		}
+		return '\x1b';
+	}
+	else{
+		return c;
+	}
 }
 void processKeypress()//manages all the editor modes and special characters
 {
@@ -106,6 +124,12 @@ void processKeypress()//manages all the editor modes and special characters
 		case ctrl('q'):
 			clearScreen(0);
 			exit(0);
+			break;
+		case 'w':
+		case 's':
+		case 'a':
+		case 'd':
+			moveCursor(curr);
 			break;
 	}
 }
@@ -150,6 +174,7 @@ void clearScreen(int options)
 
 //	bufAppend(&ab,"\x1b[H",3);
 	char buf[32];
+//	E.cx=12;
 	snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.cy+1,E.cx+1);
 	bufAppend(&ab,buf,strlen(buf));
 
@@ -173,6 +198,22 @@ int cursorPosition(int* rows,int* cols)
 	if(buf[0]!='\x1b' || buf[1]!='[') return -1;
 	if(sscanf(&buf[2], "%d;%d",rows,cols)!=2) return -1;
 	return 0;
+}
+void moveCursor(char key) {
+  switch (key) {
+    case 'a':
+      E.cx--;
+      break;
+    case 'd':
+      E.cx++;
+      break;
+    case 'w':
+      E.cy--;
+      break;
+    case 's':
+      E.cy++;
+      break;
+  }
 }
 int main(){
 	enableRawMode();
