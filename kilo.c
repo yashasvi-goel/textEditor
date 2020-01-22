@@ -1,5 +1,6 @@
 #include<unistd.h>
 #include<sys/ioctl.h>
+#include <sys/types.h>
 #include<termios.h>
 #include<stdlib.h>
 #include<stdio.h>
@@ -21,11 +22,16 @@ enum editorKey {
 	PAGE_UP,
 	PAGE_DOWN
 };
-
+typedef struct erow {
+  int size;
+  char *chars;
+} erow;
 typedef struct editorConfig{
 	int cx,cy;
 	int screenRows;
 	int screenColumns;
+	int numRows;
+	erow row;
 	struct termios orig_termios;
 }editorConfig;
 typedef struct strBuffer{
@@ -54,6 +60,16 @@ void die(const char *s)
 	perror(s);
 	exit(1);
 }
+void editorOpen()
+{
+	char *line="Hello,World!";
+	ssize_t linelen=13;
+	E.row.size=linelen;
+	E.row.chars=malloc(linelen+1);
+	memcpy(E.row.chars, line ,linelen);
+	E.row.chars[linelen]='\0';
+	E.numRows=1;
+}
 int getWindowSize(int *rows, int *cols)
 {
 	struct winsize ws;
@@ -71,6 +87,7 @@ int getWindowSize(int *rows, int *cols)
 void initEditor(){
 	E.cx=0;
 	E.cy=0;
+	E.numRows=0;
 	if(getWindowSize(&E.screenRows,&E.screenColumns)==-1)
 		die("Window");
 }
@@ -274,6 +291,7 @@ void moveCursor(int key) {
 int main(){
 	enableRawMode();
 	initEditor();
+	editorOpen();
 	while(1){
 		clearScreen(1);
 		processKeypress();
