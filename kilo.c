@@ -10,6 +10,18 @@
 #define str_INIT {NULL,0}
 #define version "0.0.1"
 
+enum editorKey {
+	ARROW_LEFT = 1000,
+	ARROW_RIGHT,
+	ARROW_UP,
+	ARROW_DOWN,
+	DEL_KEY,
+	HOME_KEY,
+	END_KEY,
+	PAGE_UP,
+	PAGE_DOWN
+};
+
 typedef struct editorConfig{
 	int cx,cy;
 	int screenRows;
@@ -33,8 +45,8 @@ void bufAppend(strBuffer* ab,const char *s,int len){
 }
 struct editorConfig E;
 void clearScreen();
-char readKey();
-void moveCursor(char);
+int readKey();
+void moveCursor(int);
 int cursorPosition(int*,int*);
 void die(const char *s)
 {
@@ -44,17 +56,17 @@ void die(const char *s)
 }
 int getWindowSize(int *rows, int *cols)
 {
-  struct winsize ws;
-  if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0){
-	  if(write(STDOUT_FILENO,"\x1b[500C\x1b[600B",12)!= 12)
-		  return -1;
-	  return cursorPosition(rows,cols);
-  }
-  else{
-    *cols = ws.ws_col;
-    *rows = ws.ws_row;
-    return 0;
-  }
+	struct winsize ws;
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0){
+		if(write(STDOUT_FILENO,"\x1b[500C\x1b[600B",12)!= 12)
+			return -1;
+		return cursorPosition(rows,cols);
+	}
+	else{
+		*cols = ws.ws_col;
+		*rows = ws.ws_row;
+		return 0;
+	}
 }
 void initEditor(){
 	E.cx=0;
@@ -84,13 +96,13 @@ void enableRawMode()
 	raw.c_oflag&= ~(OPOST);//OPOST disables all post-processing including carriage operator
 	//Following are to edit config of read()
 	raw.c_cc[VMIN]=0;//min chars after which read returns
-	raw.c_cc[VTIME]=10;//max time read() waits before returning
+	raw.c_cc[VTIME]=1;//max time read() waits before returning
 
 
 	if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw)==-1)//apply the attrs(file,delay,which one)
 		die("tcsetattr");
 }
-char readKey()//reads input character-by-character
+int readKey()//reads input character-by-character
 {
 	int nread=0;
 	char c='\0';
@@ -104,11 +116,37 @@ char readKey()//reads input character-by-character
 		if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b';
 		if (seq[0] == '[')
 		{
+			if (seq[1] >= '0' && seq[1] <= '9')
+			{
+				if (read(STDIN_FILENO, &seq[2], 1) != 1) return '\x1b';
+				if (seq[2] == '~')
+				{
+					switch (seq[1]){
+						case '1': return HOME_KEY;
+						case '3': return DEL_KEY;
+						case '4': return END_KEY;
+						case '5': return PAGE_UP;
+						case '6': return PAGE_DOWN;
+						case '7': return HOME_KEY;
+						case '8': return END_KEY;
+					}
+				}
+			}
+			else{
+				switch (seq[1]){
+					case 'A': return ARROW_UP;
+					case 'B': return ARROW_DOWN;
+					case 'C': return ARROW_RIGHT;
+					case 'D': return ARROW_LEFT;
+					case 'H': return HOME_KEY;
+					case 'F': return END_KEY;
+				}
+			}
+		}
+		else if (seq[0] == 'O'){
 			switch (seq[1]){
-				case 'A': return 'w';
-				case 'B': return 's';
-				case 'C': return 'd';
-				case 'D': return 'a';
+				case 'H': return HOME_KEY;
+				case 'F': return END_KEY;
 			}
 		}
 		return '\x1b';
@@ -119,16 +157,30 @@ char readKey()//reads input character-by-character
 }
 void processKeypress()//manages all the editor modes and special characters
 {
-	char curr=readKey();
+	int curr=readKey();
 	switch(curr){//add all the mode controls below
 		case ctrl('q'):
 			clearScreen(0);
 			exit(0);
 			break;
-		case 'w':
-		case 's':
-		case 'a':
-		case 'd':
+		case HOME_KEY:
+			E.cx=0;
+			break;
+		case END_KEY:
+			E.cx=E.screenColumns-1;
+			break;
+		case PAGE_UP:
+		case PAGE_DOWN:
+			{
+				int times = E.screenRows;
+				while (times--)
+					moveCursor(curr == PAGE_UP ? ARROW_UP : ARROW_DOWN);
+			}
+			break;
+		case ARROW_UP:
+		case ARROW_DOWN:
+		case ARROW_LEFT:
+		case ARROW_RIGHT:
 			moveCursor(curr);
 			break;
 	}
@@ -156,10 +208,10 @@ void drawTildes(strBuffer* ab)//draws tildes
 			bufAppend(ab,"~",1);
 		}
 		bufAppend(ab,"\x1b[K",3);
-//		write(STDOUT_FILENO,"~",1);
+		//		write(STDOUT_FILENO,"~",1);
 		if(y<E.screenRows-1)
 			bufAppend(ab,"\r\n",2);
-//			write(STDOUT_FILENO,"\r\n",3);
+		//			write(STDOUT_FILENO,"\r\n",3);
 	}
 }
 void clearScreen(int options)
@@ -172,9 +224,9 @@ void clearScreen(int options)
 	if(options==1)
 		drawTildes(&ab);
 
-//	bufAppend(&ab,"\x1b[H",3);
+	//	bufAppend(&ab,"\x1b[H",3);
 	char buf[32];
-//	E.cx=12;
+	//	E.cx=12;
 	snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.cy+1,E.cx+1);
 	bufAppend(&ab,buf,strlen(buf));
 
@@ -199,21 +251,25 @@ int cursorPosition(int* rows,int* cols)
 	if(sscanf(&buf[2], "%d;%d",rows,cols)!=2) return -1;
 	return 0;
 }
-void moveCursor(char key) {
-  switch (key) {
-    case 'a':
-      E.cx--;
-      break;
-    case 'd':
-      E.cx++;
-      break;
-    case 'w':
-      E.cy--;
-      break;
-    case 's':
-      E.cy++;
-      break;
-  }
+void moveCursor(int key) {
+	switch (key) {
+		case ARROW_LEFT:
+			if(E.cx!=0)
+				E.cx--;
+			break;
+		case ARROW_RIGHT:
+			if(E.cx!=E.screenColumns-1)
+				E.cx++;
+			break;
+		case ARROW_UP:
+			if(E.cy!=0)
+				E.cy--;
+			break;
+		case ARROW_DOWN:
+			if(E.cy!=E.screenRows-1)
+				E.cy++;
+			break;
+	}
 }
 int main(){
 	enableRawMode();
