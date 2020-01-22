@@ -60,15 +60,27 @@ void die(const char *s)
 	perror(s);
 	exit(1);
 }
-void editorOpen()
+void editorOpen(char *filename)
 {
-	char *line="Hello,World!";
-	ssize_t linelen=13;
+	FILE *fp=fopen(filename,"r");
+	if(!fp)
+		die("fopen");
+	char *line=NULL;
+	size_t *linecap=0;
+	ssize_t linelen;
+	linelen = getline(&line, &linecap, fp);
+	if (linelen != -1) {
+		while (linelen > 0 && (line[linelen - 1] == '\n' ||
+					line[linelen - 1] == '\r'))
+	    linelen--;
 	E.row.size=linelen;
 	E.row.chars=malloc(linelen+1);
 	memcpy(E.row.chars, line ,linelen);
 	E.row.chars[linelen]='\0';
 	E.numRows=1;
+	}
+	free(line);
+	fclose(fp);
 }
 int getWindowSize(int *rows, int *cols)
 {
@@ -207,6 +219,7 @@ void drawTildes(strBuffer* ab)//draws tildes
 	int y;
 	for(y=0;y<E.screenRows;y++)
 	{
+		if(y>=E.numRows){
 		if(y==E.screenRows / 3){
 			char welcome[80];
 			int welcomelen = snprintf(welcome, sizeof(welcome),"Kilo editor -- version %s", version);
@@ -224,6 +237,13 @@ void drawTildes(strBuffer* ab)//draws tildes
 		else{
 			bufAppend(ab,"~",1);
 		}
+		}
+		else{
+			int len = E.row.size;
+			if (len > E.screenColumns) len = E.screenColumns;
+			bufAppend(ab, E.row.chars, len);
+		}
+
 		bufAppend(ab,"\x1b[K",3);
 		//		write(STDOUT_FILENO,"~",1);
 		if(y<E.screenRows-1)
@@ -288,10 +308,12 @@ void moveCursor(int key) {
 			break;
 	}
 }
-int main(){
+int main(int argc,char *argv[]){
 	enableRawMode();
 	initEditor();
-	editorOpen();
+	if(argc>=2){
+		editorOpen(argv[1]);
+	}
 	while(1){
 		clearScreen(1);
 		processKeypress();
