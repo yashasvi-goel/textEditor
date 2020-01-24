@@ -28,7 +28,9 @@ enum editorKey {
 };
 typedef struct erow {
   int size;
+  int rsize;
   char *chars;
+  char *render;
 } erow;
 typedef struct editorConfig{
 	int cx,cy;
@@ -65,6 +67,18 @@ void die(const char *s)
 	perror(s);
 	exit(1);
 }
+void editorUpdateRow(erow *row){
+	free(row->render);
+	row->render=malloc(row->size+1);
+
+	int j;
+	int idx=0;
+	for(j=0;j<row->size;j++){
+		row->render[idx++]=row->chars[j];
+	}
+	row->render[idx]='\0';
+	row->rsize=idx;
+}
 void editorAppendRow(char *line,size_t linelen){
 
 	E.row=realloc(E.row,sizeof(erow)*(E.numRows+1));
@@ -74,6 +88,11 @@ void editorAppendRow(char *line,size_t linelen){
 	E.row[at].chars=malloc(linelen+1);
 	memcpy(E.row[at].chars, line ,linelen);
 	E.row[at].chars[linelen]='\0';
+
+	E.row[at].rsize=0;
+	E.row[at].render=NULL;
+	editorUpdateRow(&E.row[at]);
+
 	E.numRows++;
 }
 void editorOpen(char *filename)
@@ -253,11 +272,11 @@ void drawTildes(strBuffer* ab)//draws tildes
 			}
 		}
 		else{
-			int len = E.row[filerow].size - E.colOffset;
+			int len = E.row[filerow].rsize - E.colOffset;
 			if(len<0)
 				len=0;
 			if (len > E.screenColumns) len = E.screenColumns;
-			bufAppend(ab, &E.row[filerow].chars[E.colOffset], len);
+			bufAppend(ab, &E.row[filerow].render[E.colOffset], len);
 		}
 
 		bufAppend(ab,"\x1b[K",3);
