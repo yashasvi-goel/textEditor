@@ -32,7 +32,7 @@ typedef struct erow {
 } erow;
 typedef struct editorConfig{
 	int cx,cy;
-	int rowOffset;
+	int rowOffset,colOffset;
 	int screenRows;
 	int screenColumns;
 	int numRows;
@@ -61,8 +61,6 @@ void moveCursor(int);
 int cursorPosition(int*,int*);
 void die(const char *s)
 {
-//	write(STDOUT_FILENO, "\x1b[2J", 4);
-//	write(STDOUT_FILENO, "\x1b[H", 3);
 	clearScreen(0);
 	perror(s);
 	exit(1);
@@ -112,6 +110,7 @@ void initEditor(){
 	E.cx=0;
 	E.cy=0;
 	E.rowOffset=0;
+	E.colOffset=0;
 	E.numRows=0;
 	E.row=NULL;
 	if(getWindowSize(&E.screenRows,&E.screenColumns)==-1)
@@ -254,9 +253,11 @@ void drawTildes(strBuffer* ab)//draws tildes
 			}
 		}
 		else{
-			int len = E.row[filerow].size;
+			int len = E.row[filerow].size - E.colOffset;
+			if(len<0)
+				len=0;
 			if (len > E.screenColumns) len = E.screenColumns;
-			bufAppend(ab, E.row[filerow].chars, len);
+			bufAppend(ab, &E.row[filerow].chars[E.colOffset], len);
 		}
 
 		bufAppend(ab,"\x1b[K",3);
@@ -272,6 +273,12 @@ void editorScroll(){
 	}
 	if(E.cy>=E.rowOffset+E.screenRows){
 		E.rowOffset=E.cy- E.screenRows+1;
+	}
+	if(E.cx<E.colOffset){
+		E.colOffset=E.cx;
+	}
+	if(E.cx>=E.colOffset+E.screenColumns){
+		E.colOffset=E.cx - E.screenColumns+1;
 	}
 }
 void clearScreen(int options)
@@ -289,11 +296,9 @@ void clearScreen(int options)
 	//	bufAppend(&ab,"\x1b[H",3);
 	char buf[32];
 	//	E.cx=12;
-	snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.cy+1,E.cx+1);
+	snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.cy -E.rowOffset+1,E.cx-E.colOffset+1);
 	bufAppend(&ab,buf,strlen(buf));
-
 	bufAppend(&ab,"\x1b[?25h",6);
-
 	write(STDOUT_FILENO,ab.buffer,ab.len);
 	bufFree(&ab);
 }
@@ -313,15 +318,24 @@ int cursorPosition(int* rows,int* cols)
 	if(sscanf(&buf[2], "%d;%d",rows,cols)!=2) return -1;
 	return 0;
 }
-void moveCursor(int key) {
+void moveCursor(int key){
+	erow *row=(E.cy >= E.numRows) ? NULL : &E.row[E.cy];
 	switch (key) {
 		case ARROW_LEFT:
 			if(E.cx!=0)
 				E.cx--;
+			else if(E.cy>0){
+				E.cy--;
+				E.cx=E.row[E.cy].size;
+			}
 			break;
 		case ARROW_RIGHT:
-			if(E.cx!=E.screenColumns-1)
+			if(row&& E.cx<row->size)
 				E.cx++;
+			else if(row && E.cx==row->size){
+				E.cy++;
+				E.cx=0;
+			}
 			break;
 		case ARROW_UP:
 			if(E.cy!=0)
@@ -331,6 +345,12 @@ void moveCursor(int key) {
 			if(E.cy<E.numRows)
 				E.cy++;
 			break;
+	}
+	row = (E.cy >= E.numRows) ? NULL : &E.row[E.cy];
+	int rowlen = row ? row->size : 0;
+	if (E.cx > rowlen) {
+//		E.cy++;
+		E.cx = rowlen;
 	}
 }
 int main(int argc,char *argv[]){
