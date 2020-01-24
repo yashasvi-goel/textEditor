@@ -1,3 +1,7 @@
+//#define _DEFAULT_SOURCE
+//#define _BSD_SOURCE
+//#define _GNU_SOURCE
+
 #include<unistd.h>
 #include<sys/ioctl.h>
 #include <sys/types.h>
@@ -28,10 +32,11 @@ typedef struct erow {
 } erow;
 typedef struct editorConfig{
 	int cx,cy;
+	int rowOffset;
 	int screenRows;
 	int screenColumns;
 	int numRows;
-	erow row;
+	erow *row;
 	struct termios orig_termios;
 }editorConfig;
 typedef struct strBuffer{
@@ -60,6 +65,17 @@ void die(const char *s)
 	perror(s);
 	exit(1);
 }
+void editorAppendRow(char *line,size_t linelen){
+
+	E.row=realloc(E.row,sizeof(erow)*(E.numRows+1));
+
+	int at=E.numRows;
+	E.row[at].size=linelen;
+	E.row[at].chars=malloc(linelen+1);
+	memcpy(E.row[at].chars, line ,linelen);
+	E.row[at].chars[linelen]='\0';
+	E.numRows++;
+}
 void editorOpen(char *filename)
 {
 	FILE *fp=fopen(filename,"r");
@@ -68,16 +84,10 @@ void editorOpen(char *filename)
 	char *line=NULL;
 	size_t *linecap=0;
 	ssize_t linelen;
-	linelen = getline(&line, &linecap, fp);
-	if (linelen != -1) {
-		while (linelen > 0 && (line[linelen - 1] == '\n' ||
-					line[linelen - 1] == '\r'))
-	    linelen--;
-	E.row.size=linelen;
-	E.row.chars=malloc(linelen+1);
-	memcpy(E.row.chars, line ,linelen);
-	E.row.chars[linelen]='\0';
-	E.numRows=1;
+	while((linelen = getline(&line, &linecap, fp))!=-1){
+		while (linelen > 0 && (line[linelen - 1] == '\n' ||line[linelen - 1] == '\r'))
+			linelen--;
+		editorAppendRow(line,linelen);
 	}
 	free(line);
 	fclose(fp);
@@ -99,7 +109,9 @@ int getWindowSize(int *rows, int *cols)
 void initEditor(){
 	E.cx=0;
 	E.cy=0;
+	E.rowOffset=0;
 	E.numRows=0;
+	E.row=NULL;
 	if(getWindowSize(&E.screenRows,&E.screenColumns)==-1)
 		die("Window");
 }
@@ -219,29 +231,30 @@ void drawTildes(strBuffer* ab)//draws tildes
 	int y;
 	for(y=0;y<E.screenRows;y++)
 	{
-		if(y>=E.numRows){
-		if(y==E.screenRows / 3){
-			char welcome[80];
-			int welcomelen = snprintf(welcome, sizeof(welcome),"Kilo editor -- version %s", version);
-			if(welcomelen > E.screenColumns)
-				welcomelen = E.screenColumns;
-			int padding =(E.screenColumns-welcomelen)/2;
-			if(padding){
-				bufAppend(ab,"~",1);
-				padding--;
+		int filerow=y+E.rowOffset;
+		if(filerow>=E.numRows){
+			if(E.numRows==0 && y==E.screenRows / 3){
+				char welcome[80];
+				int welcomelen = snprintf(welcome, sizeof(welcome),"Kilo editor -- version %s", version);
+				if(welcomelen > E.screenColumns)
+					welcomelen = E.screenColumns;
+				int padding =(E.screenColumns-welcomelen)/2;
+				if(padding){
+					bufAppend(ab,"~",1);
+					padding--;
+				}
+				while(padding--)
+					bufAppend(ab," ",1);
+				bufAppend(ab, welcome, welcomelen);
 			}
-			while(padding--)
-				bufAppend(ab," ",1);
-			bufAppend(ab, welcome, welcomelen);
+			else{
+				bufAppend(ab,"~",1);
+			}
 		}
 		else{
-			bufAppend(ab,"~",1);
-		}
-		}
-		else{
-			int len = E.row.size;
+			int len = E.row[filerow].size;
 			if (len > E.screenColumns) len = E.screenColumns;
-			bufAppend(ab, E.row.chars, len);
+			bufAppend(ab, E.row[filerow].chars, len);
 		}
 
 		bufAppend(ab,"\x1b[K",3);
@@ -251,8 +264,18 @@ void drawTildes(strBuffer* ab)//draws tildes
 		//			write(STDOUT_FILENO,"\r\n",3);
 	}
 }
+void editorScroll(){
+	if(E.cy<E.rowOffset){
+		E.rowOffset=E.cy;
+	}
+	if(E.cy>=E.rowOffset+E.screenRows){
+		E.rowOffset=E.cy- E.screenRows+1;
+	}
+}
 void clearScreen(int options)
 {
+	editorScroll();
+
 	strBuffer ab=str_INIT;
 	bufAppend(&ab,"\x1b[?25l",6);
 	if(options==0)
@@ -303,7 +326,7 @@ void moveCursor(int key) {
 				E.cy--;
 			break;
 		case ARROW_DOWN:
-			if(E.cy!=E.screenRows-1)
+			if(E.cy<E.numRows)
 				E.cy++;
 			break;
 	}
@@ -318,5 +341,6 @@ int main(int argc,char *argv[]){
 		clearScreen(1);
 		processKeypress();
 	}
+	disableRawMode();
 	return 0;
 }
