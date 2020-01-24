@@ -61,6 +61,8 @@ void moveCursor(int);
 int cursorPosition(int*,int*);
 void die(const char *s)
 {
+//	write(STDOUT_FILENO, "\x1b[2J", 4);
+//	write(STDOUT_FILENO, "\x1b[H", 3);
 	clearScreen(0);
 	perror(s);
 	exit(1);
@@ -290,7 +292,7 @@ void clearScreen(int options)
 	snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.cy+1,E.cx+1);
 	bufAppend(&ab,buf,strlen(buf));
 
-	bufAppend(&ab,"\x1b[?25l",6);
+	bufAppend(&ab,"\x1b[?25h",6);
 
 	write(STDOUT_FILENO,ab.buffer,ab.len);
 	bufFree(&ab);
