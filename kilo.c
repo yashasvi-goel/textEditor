@@ -4,7 +4,7 @@
 
 #include<unistd.h>
 #include<sys/ioctl.h>
-#include <sys/types.h>
+#include<sys/types.h>
 #include<termios.h>
 #include<stdlib.h>
 #include<stdio.h>
@@ -14,6 +14,7 @@
 #define ctrl(k) ((k) & 0x1f)
 #define str_INIT {NULL,0}
 #define version "0.0.1"
+#define _TAB_STOP 8
 
 enum editorKey {
 	ARROW_LEFT = 1000,
@@ -33,10 +34,12 @@ typedef struct erow {
   char *render;
 } erow;
 typedef struct editorConfig{
-	int cx,cy;
+	int cx,cy;//cx is posn in the line,without indentation
+	int rx;//actual posn in line
 	int rowOffset,colOffset;
 	int screenRows;
 	int screenColumns;
+	char *file;
 	int numRows;
 	erow *row;
 	struct termios orig_termios;
@@ -68,16 +71,37 @@ void die(const char *s)
 	exit(1);
 }
 void editorUpdateRow(erow *row){
-	free(row->render);
-	row->render=malloc(row->size+1);
-
+	int tabs=0;
 	int j;
+	for(j=0;j<row->size;j++)
+		if(row->chars[j]=='\t')
+			tabs++;
+	free(row->render);
+	row->render=malloc(row->size+tabs*(_TAB_STOP-1) +1);
+
 	int idx=0;
 	for(j=0;j<row->size;j++){
-		row->render[idx++]=row->chars[j];
+		if(row->chars[j]=='\t'){
+			row->render[idx++]=' ';
+			while(idx% _TAB_STOP !=0)
+				row->render[idx++]=' ';
+		}
+		else{
+			row->render[idx++]=row->chars[j];
+		}
 	}
 	row->render[idx]='\0';
 	row->rsize=idx;
+}
+int editorRowCxToRx(erow *row, int cx) {
+  int rx = 0;
+  int j;
+  for (j = 0; j < cx; j++) {
+    if (row->chars[j] == '\t')
+      rx += (_TAB_STOP - 1) - (rx % _TAB_STOP);
+    rx++;
+  }
+  return rx;
 }
 void editorAppendRow(char *line,size_t linelen){
 
@@ -97,6 +121,9 @@ void editorAppendRow(char *line,size_t linelen){
 }
 void editorOpen(char *filename)
 {
+	free(E.file);
+	E.file=strdup(filename);
+
 	FILE *fp=fopen(filename,"r");
 	if(!fp)
 		die("fopen");
@@ -128,12 +155,15 @@ int getWindowSize(int *rows, int *cols)
 void initEditor(){
 	E.cx=0;
 	E.cy=0;
+	E.rx=0;
 	E.rowOffset=0;
 	E.colOffset=0;
 	E.numRows=0;
 	E.row=NULL;
+	E.file=NULL;
 	if(getWindowSize(&E.screenRows,&E.screenColumns)==-1)
 		die("Window");
+	E.screenRows-=1;
 }
 void disableRawMode()
 {
@@ -228,11 +258,20 @@ void processKeypress()//manages all the editor modes and special characters
 			E.cx=0;
 			break;
 		case END_KEY:
-			E.cx=E.screenColumns-1;
+			if(E.cy<E.numRows)
+				E.cx=E.row[E.cy].size;
 			break;
 		case PAGE_UP:
 		case PAGE_DOWN:
 			{
+				if (curr == PAGE_UP) {
+					E.cy = E.rowOffset;
+				}
+				else if(curr == PAGE_DOWN){
+					E.cy = E.rowOffset + E.screenRows - 1;
+					if (E.cy > E.numRows)
+						E.cy = E.numRows;
+				}
 				int times = E.screenRows;
 				while (times--)
 					moveCursor(curr == PAGE_UP ? ARROW_UP : ARROW_DOWN);
@@ -245,6 +284,24 @@ void processKeypress()//manages all the editor modes and special characters
 			moveCursor(curr);
 			break;
 	}
+}
+void drawStatusBar(strBuffer* ab)
+{
+	bufAppend(ab,"\x1b[7m",4);
+	char status[80];
+	int len=0;
+//	char *file;
+//	if(E.file!=NULL)
+//		file=strdup(&E.file);
+	len=snprintf(status,sizeof(status),"%.20s -%d lines",/*E.file ? E.file : */"NONE",E.numRows);//TODO BUG HERE
+	if(len> E.screenColumns)
+		len=E.screenColumns;
+	bufAppend(ab,status,len);
+	while(len<E.screenColumns){
+		bufAppend(ab," ",1);
+		len++;
+	}
+	bufAppend(ab,"\x1b[m",3);
 }
 void drawTildes(strBuffer* ab)//draws tildes
 {
@@ -281,23 +338,27 @@ void drawTildes(strBuffer* ab)//draws tildes
 
 		bufAppend(ab,"\x1b[K",3);
 		//		write(STDOUT_FILENO,"~",1);
-		if(y<E.screenRows-1)
+//		if(y<E.screenRows-1)
 			bufAppend(ab,"\r\n",2);
 		//			write(STDOUT_FILENO,"\r\n",3);
 	}
 }
 void editorScroll(){
+	E.rx=0;
+	if(E.cy<E.numRows){
+		E.rx=editorRowCxToRx(&E.row[E.cy],E.cx);
+	}
 	if(E.cy<E.rowOffset){
 		E.rowOffset=E.cy;
 	}
 	if(E.cy>=E.rowOffset+E.screenRows){
 		E.rowOffset=E.cy- E.screenRows+1;
 	}
-	if(E.cx<E.colOffset){
-		E.colOffset=E.cx;
+	if(E.rx<E.colOffset){
+		E.colOffset=E.rx;
 	}
-	if(E.cx>=E.colOffset+E.screenColumns){
-		E.colOffset=E.cx - E.screenColumns+1;
+	if(E.rx>=E.colOffset+E.screenColumns){
+		E.colOffset=E.rx - E.screenColumns+1;
 	}
 }
 void clearScreen(int options)
@@ -310,12 +371,15 @@ void clearScreen(int options)
 		bufAppend(&ab,"\x1b[2J",4);
 	bufAppend(&ab,"\x1b[H",3);
 	if(options==1)
+	{
 		drawTildes(&ab);
+		drawStatusBar(&ab);
+	}
 
 	//	bufAppend(&ab,"\x1b[H",3);
 	char buf[32];
 	//	E.cx=12;
-	snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.cy -E.rowOffset+1,E.cx-E.colOffset+1);
+	snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.cy -E.rowOffset+1,E.rx-E.colOffset+1);
 	bufAppend(&ab,buf,strlen(buf));
 	bufAppend(&ab,"\x1b[?25h",6);
 	write(STDOUT_FILENO,ab.buffer,ab.len);
