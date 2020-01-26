@@ -288,18 +288,29 @@ void processKeypress()//manages all the editor modes and special characters
 void drawStatusBar(strBuffer* ab)
 {
 	bufAppend(ab,"\x1b[7m",4);
-	char status[80];
+	char status[80], rstatus[80];
 	int len=0;
 //	char *file;
-//	if(E.file!=NULL)
+	if(E.file==NULL)
 //		file=strdup(&E.file);
-	len=snprintf(status,sizeof(status),"%.20s -%d lines",/*E.file ? E.file : */"NONE",E.numRows);//TODO BUG HERE
+		len=snprintf(status,sizeof(status),"%.20s -%d lines",/*E.file ? E.file : */"NONE",E.numRows);//TODO BUG HERE
+//	else{
+//		*E.file='\0';
+//		len=snprintf(status,sizeof(status),"%.20s -%d lines",E.file,E.numRows);//TODO BUG HERE
+//	}
+	 int rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d", E.cy + 1, E.numRows);
 	if(len> E.screenColumns)
 		len=E.screenColumns;
 	bufAppend(ab,status,len);
 	while(len<E.screenColumns){
+		if(E.screenColumns-len==rlen){
+			bufAppend(ab,rstatus,rlen);
+			break;
+		}
+		else{
 		bufAppend(ab," ",1);
 		len++;
+		}
 	}
 	bufAppend(ab,"\x1b[m",3);
 }
