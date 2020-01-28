@@ -8,6 +8,8 @@
 #include<termios.h>
 #include<stdlib.h>
 #include<stdio.h>
+#include<time.h>
+#include<stdarg.h>
 #include<ctype.h>
 #include<string.h>
 
@@ -42,6 +44,8 @@ typedef struct editorConfig{
 	char *file;
 	int numRows;
 	erow *row;
+	char status[80];
+	time_t statusTime;
 	struct termios orig_termios;
 }editorConfig;
 typedef struct strBuffer{
@@ -161,6 +165,9 @@ void initEditor(){
 	E.numRows=0;
 	E.row=NULL;
 	E.file=NULL;
+	E.status[0]="\0";
+	E.statusTime=0;
+
 	if(getWindowSize(&E.screenRows,&E.screenColumns)==-1)
 		die("Window");
 	E.screenRows-=1;
@@ -284,6 +291,13 @@ void processKeypress()//manages all the editor modes and special characters
 			moveCursor(curr);
 			break;
 	}
+}
+void editorSetStatusMessage(const char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(E.status, sizeof(E.status), fmt, ap);
+  va_end(ap);
+  E.statusTime = time(NULL);
 }
 void drawStatusBar(strBuffer* ab)
 {
