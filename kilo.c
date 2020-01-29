@@ -1,6 +1,6 @@
-//#define _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE
 //#define _BSD_SOURCE
-//#define _GNU_SOURCE
+#define _GNU_SOURCE
 
 #include<unistd.h>
 #include<sys/ioctl.h>
@@ -305,11 +305,11 @@ void drawStatusBar(strBuffer* ab)
 	char status[80], rstatus[80];
 	int len=0;
 //	char *file;
-	if(E.file==NULL)
+//	if(E.file==NULL)
 //		file=strdup(&E.file);
-		len=snprintf(status,sizeof(status),"%.20s -%d lines",/*E.file ? E.file : */"NONE",E.numRows);//TODO BUG HERE
+		len=snprintf(status,sizeof(status),"%.20s -%d lines",E.file ? E.file : "NONE",E.numRows);
 //	else{
-//		*E.file='\0';
+////		*E.file='\0';
 //		len=snprintf(status,sizeof(status),"%.20s -%d lines",E.file,E.numRows);//TODO BUG HERE
 //	}
 	 int rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d", E.cy + 1, E.numRows);
