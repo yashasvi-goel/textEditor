@@ -18,6 +18,7 @@
 #define str_INIT {NULL,0}
 #define version "0.0.1"
 #define _TAB_STOP 8
+#define KILO_QUIT_TIMES 3
 
 enum editorKey {
 	BACKSPACE =127,
@@ -69,8 +70,9 @@ void bufAppend(strBuffer* ab,const char *s,int len){
 struct editorConfig E;
 void clearScreen();
 int readKey();
+void editorSetStatusMessage(const char *fmt, ...); 
 void moveCursor(int);
-void editorInsertChar(char);
+void editorInsertChar(int);
 int cursorPosition(int*,int*);
 void saveToFile();
 void die(const char *s)
@@ -138,7 +140,7 @@ void editorOpen(char *filename)
 	if(!fp)
 		die("fopen");
 	char *line=NULL;
-	size_t *linecap=0;
+	size_t linecap=0;
 	ssize_t linelen;
 	while((linelen = getline(&line, &linecap, fp))!=-1){
 		while (linelen > 0 && (line[linelen - 1] == '\n' ||line[linelen - 1] == '\r'))
@@ -224,7 +226,8 @@ int readKey()//reads input character-by-character
 		{
 			if (seq[1] >= '0' && seq[1] <= '9')
 			{
-				if (read(STDIN_FILENO, &seq[2], 1) != 1) return '\x1b';
+				if (read(STDIN_FILENO, &seq[2], 1) != 1)
+					return '\x1b';
 				if (seq[2] == '~')
 				{
 					switch (seq[1]){
@@ -263,13 +266,20 @@ int readKey()//reads input character-by-character
 }
 void processKeypress()//manages all the editor modes and special characters
 {
+	static int quit_times=KILO_QUIT_TIMES;
 	int curr=readKey();
 	switch(curr){//add all the mode controls below
 		case '\r':
-			E.cy++;
-			E.colOffset=E.cx=0;
+//			E.cy++;
+//			E.colOffset=E.cx=0;
 			break;
 		case ctrl('q'):
+			if (E.dirty && quit_times > 0) {
+				editorSetStatusMessage("WARNING!!! File has unsaved changes. "
+						"Press Ctrl-Q %d more times to quit.", quit_times);
+				quit_times--;
+				return;
+			}
 			clearScreen(0);
 			exit(0);
 			break;
@@ -317,6 +327,15 @@ void processKeypress()//manages all the editor modes and special characters
 			editorInsertChar(curr);
 			break;
 	}
+	quit_times=KILO_QUIT_TIMES;
+}
+void editorRowDelChar(erow *row, int at) {
+  if (at < 0 || at >= row->size)
+	  return;
+  memmove(&row->chars[at], &row->chars[at + 1], row->size - at);
+  row->size--;
+  editorUpdateRow(row);
+  E.dirty++;
 }
 void editorSetStatusMessage(const char *fmt, ...) {
   va_list ap;
@@ -490,6 +509,7 @@ void moveCursor(int key){
 				E.cy++;
 			break;
 	}
+
 	row = (E.cy >= E.numRows) ? NULL : &E.row[E.cy];
 	int rowlen = row ? row->size : 0;
 	if (E.cx > rowlen) {
@@ -507,7 +527,7 @@ void editorRowInsertChar(erow* row,int at,int c){//insert a single char 'c' at '
 	editorUpdateRow(row);
 	E.dirty++;
 }
-void editorInsertChar(char c){
+void editorInsertChar(int c){
 	if(E.cy==E.numRows){
 		editorAppendRow("",0);
 	}
