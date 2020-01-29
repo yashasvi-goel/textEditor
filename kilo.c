@@ -165,12 +165,12 @@ void initEditor(){
 	E.numRows=0;
 	E.row=NULL;
 	E.file=NULL;
-	E.status[0]="\0";
+	E.status[0]='\0';
 	E.statusTime=0;
 
 	if(getWindowSize(&E.screenRows,&E.screenColumns)==-1)
 		die("Window");
-	E.screenRows-=1;
+	E.screenRows-=2;
 }
 void disableRawMode()
 {
@@ -294,9 +294,9 @@ void processKeypress()//manages all the editor modes and special characters
 }
 void editorSetStatusMessage(const char *fmt, ...) {
   va_list ap;
-  va_start(ap, fmt);
-  vsnprintf(E.status, sizeof(E.status), fmt, ap);
-  va_end(ap);
+  va_start(ap, fmt);//initializes ap
+  vsnprintf(E.status, sizeof(E.status), fmt, ap);//prints var arguments
+  va_end(ap);//analog of free() for va_list
   E.statusTime = time(NULL);
 }
 void drawStatusBar(strBuffer* ab)
@@ -327,6 +327,15 @@ void drawStatusBar(strBuffer* ab)
 		}
 	}
 	bufAppend(ab,"\x1b[m",3);
+	bufAppend(ab, "\r\n",2);
+}
+void drawMessageBar(strBuffer *ab) {
+  bufAppend(ab, "\x1b[K", 3);
+  int msglen = strlen(E.status);
+  if (msglen > E.screenColumns)
+	  msglen = E.screenColumns;
+  if (msglen && time(NULL) - E.statusTime < 5)
+    bufAppend(ab, E.status, msglen);
 }
 void drawTildes(strBuffer* ab)//draws tildes
 {
@@ -399,6 +408,7 @@ void clearScreen(int options)
 	{
 		drawTildes(&ab);
 		drawStatusBar(&ab);
+		drawMessageBar(&ab);
 	}
 
 	//	bufAppend(&ab,"\x1b[H",3);
@@ -467,6 +477,9 @@ int main(int argc,char *argv[]){
 	if(argc>=2){
 		editorOpen(argv[1]);
 	}
+
+	editorSetStatusMessage("HELP: quit=ctrl+q");
+
 	while(1){
 		clearScreen(1);
 		processKeypress();
