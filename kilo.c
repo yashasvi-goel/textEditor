@@ -70,6 +70,7 @@ void bufAppend(strBuffer* ab,const char *s,int len){
 struct editorConfig E;
 void clearScreen();
 int readKey();
+void editorDelChar();
 void editorSetStatusMessage(const char *fmt, ...); 
 void moveCursor(int);
 void editorInsertChar(int);
@@ -214,7 +215,7 @@ int readKey()//reads input character-by-character
 {
 	int nread=0;
 	char c='\0';
-	while((nread=read(STDIN_FILENO,&c,1))==-1){
+	while((nread=read(STDIN_FILENO,&c,1))!=1){
 		if(nread==-1)
 			die("read");
 	}
@@ -315,6 +316,9 @@ void processKeypress()//manages all the editor modes and special characters
 		case BACKSPACE:
 		case ctrl('h'):
 		case DEL_KEY:
+			if(curr== DEL_KEY)
+				moveCursor(ARROW_RIGHT);
+			editorDelChar();
 			break;
 
 		case ctrl('l'):
@@ -336,6 +340,14 @@ void editorRowDelChar(erow *row, int at) {
   row->size--;
   editorUpdateRow(row);
   E.dirty++;
+}
+void editorDelChar() {
+  if (E.cy == E.numRows) return;
+  erow *row = &E.row[E.cy];
+  if (E.cx > 0) {
+    editorRowDelChar(row, E.cx - 1);
+    E.cx--;
+  }
 }
 void editorSetStatusMessage(const char *fmt, ...) {
   va_list ap;
@@ -536,8 +548,8 @@ void editorInsertChar(int c){
 }
 char *editorRowsToString(int *buflen){
 
-	int total=0;
-	for(int j=0;j<E.numRows;j++)
+	int total=0,j;
+	for(j=0;j<E.numRows;j++)
 		total+=E.row[j].size+1;
 
 	*buflen=total;
@@ -545,31 +557,20 @@ char *editorRowsToString(int *buflen){
 	char *buf=malloc(total*sizeof(char));
 	char *str=buf;
 
-	for(int j=0;j<E.numRows;j++)
+	for(j=0;j<E.numRows;j++)
 	{
 		memcpy(str,E.row[j].chars,E.row[j].size);
+		str+=E.row[j].size;
 		*str='\n';
 		str++;
 	}
 	return buf;
 }
 void saveToFile(){//TODO probably with the automatic cursor movement
-/*	if (E.file == NULL) return;
-	int len=25;
-	char buif[] =" editorRowsToString(&len)\0";
-	char *buf=buif;
-	int fd = open(E.file, O_RDWR | O_CREAT, 0644);
-	if (fd != -1) 
-		if (ftruncate(fd, len) != -1) {
-			if (write(fd, buf, len) == 
-	}
-	free(buf);
-	return;*/
 	if(E.file==NULL)
 		return;
 	int len;
 	char *text=editorRowsToString(&len);
-
 	int fd=open(E.file, O_RDWR|O_CREAT, 0644);
 	//O_RDWR: Read and write
 	//O_CREAT: creat if it doesn't exist //0644 defines permissions for the new file
