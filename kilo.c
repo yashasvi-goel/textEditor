@@ -8,6 +8,7 @@
 #include<termios.h>
 #include<stdlib.h>
 #include<stdio.h>
+#include<fcntl.h>
 #include<time.h>
 #include<stdarg.h>
 #include<ctype.h>
@@ -19,6 +20,7 @@
 #define _TAB_STOP 8
 
 enum editorKey {
+	BACKSPACE =127,
 	ARROW_LEFT = 1000,
 	ARROW_RIGHT,
 	ARROW_UP,
@@ -43,6 +45,7 @@ typedef struct editorConfig{
 	int screenColumns;
 	char *file;
 	int numRows;
+	int dirty;
 	erow *row;
 	char status[80];
 	time_t statusTime;
@@ -67,7 +70,9 @@ struct editorConfig E;
 void clearScreen();
 int readKey();
 void moveCursor(int);
+void editorInsertChar(char);
 int cursorPosition(int*,int*);
+void saveToFile();
 void die(const char *s)
 {
 	clearScreen(0);
@@ -122,6 +127,7 @@ void editorAppendRow(char *line,size_t linelen){
 	editorUpdateRow(&E.row[at]);
 
 	E.numRows++;
+	E.dirty++;
 }
 void editorOpen(char *filename)
 {
@@ -141,6 +147,7 @@ void editorOpen(char *filename)
 	}
 	free(line);
 	fclose(fp);
+	E.dirty=0;
 }
 int getWindowSize(int *rows, int *cols)
 {
@@ -167,6 +174,7 @@ void initEditor(){
 	E.file=NULL;
 	E.status[0]='\0';
 	E.statusTime=0;
+	E.dirty=0;
 
 	if(getWindowSize(&E.screenRows,&E.screenColumns)==-1)
 		die("Window");
@@ -257,6 +265,10 @@ void processKeypress()//manages all the editor modes and special characters
 {
 	int curr=readKey();
 	switch(curr){//add all the mode controls below
+		case '\r':
+			E.cy++;
+			E.colOffset=E.cx=0;
+			break;
 		case ctrl('q'):
 			clearScreen(0);
 			exit(0);
@@ -290,6 +302,20 @@ void processKeypress()//manages all the editor modes and special characters
 		case ARROW_RIGHT:
 			moveCursor(curr);
 			break;
+		case BACKSPACE:
+		case ctrl('h'):
+		case DEL_KEY:
+			break;
+
+		case ctrl('l'):
+		case '\x1b':
+			break;
+		case ctrl('s'):
+			saveToFile();
+			break;
+		default:
+			editorInsertChar(curr);
+			break;
 	}
 }
 void editorSetStatusMessage(const char *fmt, ...) {
@@ -307,7 +333,7 @@ void drawStatusBar(strBuffer* ab)
 //	char *file;
 //	if(E.file==NULL)
 //		file=strdup(&E.file);
-		len=snprintf(status,sizeof(status),"%.20s -%d lines",E.file ? E.file : "NONE",E.numRows);
+		len=snprintf(status,sizeof(status),"%.20s -%d lines %s",E.file ? E.file : "NONE",E.numRows,E.dirty? "(modified)":"");
 //	else{
 ////		*E.file='\0';
 //		len=snprintf(status,sizeof(status),"%.20s -%d lines",E.file,E.numRows);//TODO BUG HERE
@@ -471,6 +497,78 @@ void moveCursor(int key){
 		E.cx = rowlen;
 	}
 }
+void editorRowInsertChar(erow* row,int at,int c){//insert a single char 'c' at 'at'th posn in row
+	if(at<0||at> row->size)
+		at=row->size;
+	row->chars=realloc(row->chars,row->size+2);//for the new char and the null byte
+	memmove(&row->chars[at+1],&row->chars[at],row->size - at+ 1);
+	row->size++;
+	row->chars[at]=c;
+	editorUpdateRow(row);
+	E.dirty++;
+}
+void editorInsertChar(char c){
+	if(E.cy==E.numRows){
+		editorAppendRow("",0);
+	}
+	editorRowInsertChar(&E.row[E.cy],E.cx,c);
+	E.cx++;
+}
+char *editorRowsToString(int *buflen){
+
+	int total=0;
+	for(int j=0;j<E.numRows;j++)
+		total+=E.row[j].size+1;
+
+	*buflen=total;
+
+	char *buf=malloc(total*sizeof(char));
+	char *str=buf;
+
+	for(int j=0;j<E.numRows;j++)
+	{
+		memcpy(str,E.row[j].chars,E.row[j].size);
+		*str='\n';
+		str++;
+	}
+	return buf;
+}
+void saveToFile(){//TODO probably with the automatic cursor movement
+/*	if (E.file == NULL) return;
+	int len=25;
+	char buif[] =" editorRowsToString(&len)\0";
+	char *buf=buif;
+	int fd = open(E.file, O_RDWR | O_CREAT, 0644);
+	if (fd != -1) 
+		if (ftruncate(fd, len) != -1) {
+			if (write(fd, buf, len) == 
+	}
+	free(buf);
+	return;*/
+	if(E.file==NULL)
+		return;
+	int len;
+	char *text=editorRowsToString(&len);
+
+	int fd=open(E.file, O_RDWR|O_CREAT, 0644);
+	//O_RDWR: Read and write
+	//O_CREAT: creat if it doesn't exist //0644 defines permissions for the new file
+	if(fd!=-1){
+		if(ftruncate(fd,len)!=-1){
+			if(write(fd,text,len)==len){
+				close(fd);
+				free(text);
+				E.dirty=0;
+				editorSetStatusMessage("%d bytes written to disk",len);
+				return;
+			}
+		}
+		close(fd);
+	}
+
+	free(text);
+//	editorSetStatusMessage("Can't save! I/O error: %s",strerror(errno));
+}
 int main(int argc,char *argv[]){
 	enableRawMode();
 	initEditor();
@@ -478,7 +576,7 @@ int main(int argc,char *argv[]){
 		editorOpen(argv[1]);
 	}
 
-	editorSetStatusMessage("HELP: quit=ctrl+q");
+	editorSetStatusMessage("HELP: Ctrl-S = save | Ctrl-Q = quit");
 
 	while(1){
 		clearScreen(1);
