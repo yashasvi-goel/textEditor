@@ -70,6 +70,7 @@ void bufAppend(strBuffer* ab,const char *s,int len){
 struct editorConfig E;
 void clearScreen();
 int readKey();
+char *editorPrompt(char*);
 void editorRowAppendString(erow*,char*,size_t);
 void editorDelChar();
 void editorSetStatusMessage(const char *fmt, ...); 
@@ -511,7 +512,7 @@ void clearScreen(int options)
 	if(options==0)
 		bufAppend(&ab,"\x1b[2J",4);
 	bufAppend(&ab,"\x1b[H",3);
-	if(options==1)
+	if(options==1)//default
 	{
 		drawTildes(&ab);
 		drawStatusBar(&ab);
@@ -617,8 +618,13 @@ char *editorRowsToString(int *buflen){
 	return buf;
 }
 void saveToFile(){//TODO probably with the automatic cursor movement
-	if(E.file==NULL)
-		return;
+	if(E.file==NULL){
+		E.file=editorPrompt("Save as: %s(ESC to cancel)");
+		if(E.file==NULL){
+			editorSetStatusMessage("Save Aborted");
+			return;
+		}
+	}
 	int len;
 	char *text=editorRowsToString(&len);
 	int fd=open(E.file, O_RDWR|O_CREAT, 0644);
@@ -639,6 +645,42 @@ void saveToFile(){//TODO probably with the automatic cursor movement
 
 	free(text);
 //	editorSetStatusMessage("Can't save! I/O error: %s",strerror(errno));
+}
+char* editorPrompt(char* prompt){
+	size_t bufsize=128;
+	char *buf =malloc(bufsize);
+	size_t buflen=0;
+	buf[0]='\0';
+
+	while(1){
+		editorSetStatusMessage(prompt,buf);
+		clearScreen(1);
+
+		int c =readKey();
+		if(c==DEL_KEY|| c==ctrl('h')||c== BACKSPACE){
+			if(buflen!=0)
+				buf[--buflen]='\0';
+		}
+		else if(c=='\x1b'){
+			editorSetStatusMessage("");
+			free(buf);
+			return NULL;
+		}
+		else if(c=='\r'){
+			if(buflen!=0){
+				editorSetStatusMessage("");
+				return buf;
+			}
+		}
+		else if(!iscntrl(c)&& c<128){//<128 ensures it is not a control char
+			if(buflen==bufsize-1){
+				bufsize*=2;
+				buf=realloc(buf,bufsize);
+			}
+			buf[buflen++]=c;
+			buf[buflen]= '\0';
+		}
+	}
 }
 int main(int argc,char *argv[]){
 	enableRawMode();
