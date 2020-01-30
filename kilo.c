@@ -489,8 +489,21 @@ void drawTildes(strBuffer* ab)//draws tildes
 			int len = E.row[filerow].rsize - E.colOffset;
 			if(len<0)
 				len=0;
-			if (len > E.screenColumns) len = E.screenColumns;
-			bufAppend(ab, &E.row[filerow].render[E.colOffset], len);
+			if(len > E.screenColumns)
+				len = E.screenColumns;
+			char *c =&E.row[filerow].render[E.colOffset];
+			int j;
+			for(j=0;j<len;j++){
+				if(isdigit(c[j])){
+					bufAppend(ab,"\x1b[31m",5);
+					bufAppend(ab,&c[j],1);
+					bufAppend(ab,"\x1b[39m",5);
+				}
+				else{
+					bufAppend(ab,&c[j],1);
+				}
+			}
+//			bufAppend(ab, &E.row[filerow].render[E.colOffset], len);
 		}
 
 		bufAppend(ab,"\x1b[K",3);
