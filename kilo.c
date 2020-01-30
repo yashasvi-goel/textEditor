@@ -750,7 +750,7 @@ void search(){
 	s=E.cy;
 	d=E.colOffset;
 	f=E.rowOffset;
-	char *query=editorPrompt("Search: %s (ESC to cancel)",searchCallback);
+	char *query=editorPrompt("Search: %s (Use ESC/Arrows/Enter)",searchCallback);
 	if(query)
 		free(query);
 	else{
