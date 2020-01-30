@@ -469,7 +469,7 @@ void drawTildes(strBuffer* ab)//draws tildes
 		if(filerow>=E.numRows){
 			if(E.numRows==0 && y==E.screenRows / 3){
 				char welcome[80];
-				int welcomelen = snprintf(welcome, sizeof(welcome),"Kilo editor -- version %s", version);
+				int welcomelen = snprintf(welcome, sizeof(welcome),"Kilo editor by Yashasvi Goel -- version %s", version);
 				if(welcomelen > E.screenColumns)
 					welcomelen = E.screenColumns;
 				int padding =(E.screenColumns-welcomelen)/2;
