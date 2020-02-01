@@ -32,11 +32,16 @@ enum editorKey {
 	PAGE_UP,
 	PAGE_DOWN
 };
+enum editorHighlight{
+	HL_NORMAL=0,
+	HL_NUMBER
+};
 typedef struct erow {
   int size;
   int rsize;
   char *chars;
   char *render;
+  unsigned char *hl;
 } erow;
 typedef struct editorConfig{
 	int cx,cy;//cx is posn in the line,without indentation
@@ -145,6 +150,7 @@ void editorInsertRow(int at,char * line,size_t linelen){
 
 	E.row[at].rsize=0;
 	E.row[at].render=NULL;
+	E.row[at].hl=NULL;
 	editorUpdateRow(&E.row[at]);
 
 	E.numRows++;
@@ -375,6 +381,7 @@ void processKeypress()//manages all the editor modes and special characters
 void editorFreeRow(erow* row){
 	free(row->render);
 	free(row->chars);
+	free(row->hl);
 }
 void delRow(int at){
 	if(at<0 || at>= E.numRows)
