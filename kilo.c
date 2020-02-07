@@ -21,6 +21,8 @@
 #define KILO_QUIT_TIMES 3
 #define HL_HIGHLIGHT_NMBERS (1<<0)
 #define HL_HIGHLIGHT_STRINGS (1<<1)
+#define DISPLAYED_STATUS "HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl+F= find"
+#define DISPLAYED_PROMPT "Search: %s (Use ESC/Arrows/Enter)"
 
 enum editorKey {
 	BACKSPACE =127,
@@ -721,7 +723,6 @@ void saveToFile(){//TODO probably with the automatic cursor movement
 		}
 		close(fd);
 	}
-
 	free(text);
 	//	editorSetStatusMessage("Can't save! I/O error: %s",strerror(errno));
 }
@@ -734,7 +735,6 @@ char* editorPrompt(char* prompt, void(*callback)(char*,int)){
 	while(1){
 		editorSetStatusMessage(prompt,buf);
 		clearScreen(1);
-
 		int c =readKey();
 		if(c==DEL_KEY|| c==ctrl('h')||c== BACKSPACE){
 			if(buflen!=0)
@@ -828,7 +828,7 @@ void search(){
 	s=E.cy;
 	d=E.colOffset;
 	f=E.rowOffset;
-	char *query=editorPrompt("Search: %s (Use ESC/Arrows/Enter)",searchCallback);
+	char *query=editorPrompt(DISPLAYED_PROMPT,searchCallback);
 	if(query)
 		free(query);
 	else{
@@ -898,8 +898,7 @@ int main(int argc,char *argv[]){
 	if(argc>=2){
 		editorOpen(argv[1]);
 	}
-
-	editorSetStatusMessage("HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl+F= find");
+	editorSetStatusMessage(DISPLAYED_STATUS);
 
 	while(1){
 		clearScreen(1);
