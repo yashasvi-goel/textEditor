@@ -34,7 +34,8 @@ enum editorKey {
 	HOME_KEY,
 	END_KEY,
 	PAGE_UP,
-	PAGE_DOWN
+	PAGE_DOWN,
+	KILLED=0
 };
 enum editorHighlight{
 	HL_NORMAL=0,
@@ -114,6 +115,8 @@ int is_separator(int c) {
 }
 void die(const char *s)
 {
+	moveCursor(KILLED);
+//	E.cx=0;
 	clearScreen(0);
 	perror(s);
 	exit(1);
@@ -590,7 +593,10 @@ void clearScreen(int options)
 	strBuffer ab=str_INIT;
 	bufAppend(&ab,"\x1b[?25l",6);
 	if(options==0)
+	{
+		E.cx=E.cy=0;
 		bufAppend(&ab,"\x1b[2J",4);
+	}
 	bufAppend(&ab,"\x1b[H",3);
 	if(options==1)//default
 	{
@@ -650,6 +656,10 @@ void moveCursor(int key){
 		case ARROW_DOWN:
 			if(E.cy<E.numRows)
 				E.cy++;
+			break;
+		case KILLED:
+			E.cy=0;
+			E.cx=0;
 			break;
 	}
 
