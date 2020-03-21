@@ -141,7 +141,7 @@ void editorUpdateSyntax(erow* row){
 		return;
 
 	int prev_sep=1;
-	int in_String=0;
+	// int in_String=0;
 
 	int i=0;
 	while(i<row->rsize){

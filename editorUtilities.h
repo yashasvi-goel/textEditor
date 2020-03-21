@@ -48,7 +48,7 @@ char* editorPrompt(char* prompt, void(*callback)(char*,int));
 #endif
 #ifndef SAVE_H
 #define SAVE_H
-#include"save.h"
+#include"save.c"
 #endif
 void processKeypress();
 void editorDelChar();
