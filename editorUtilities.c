@@ -1,8 +1,7 @@
 #include "editorUtilities.h"
 
 
-void clearScreen(int options)
-{
+void clearScreen(int options){
 	editorScroll();
 
 	strBuffer ab=str_INIT;
@@ -29,8 +28,7 @@ void clearScreen(int options)
 	write(STDOUT_FILENO,ab.buffer,ab.len);
 	bufFree(&ab);
 }
-void drawStatusBar(strBuffer* ab)
-{
+void drawStatusBar(strBuffer* ab){
 	bufAppend(ab,"\x1b[7m",4);
 	char status[80], rstatus[80];
 	int len=0;
@@ -163,8 +161,7 @@ void editorUpdateSyntax(erow* row){
 		i++;
 	}
 }
-int getWindowSize(int *rows, int *cols)//crap free
-{
+int getWindowSize(int *rows, int *cols){//crap free
 	struct winsize ws;
 	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0){
 		if(write(STDOUT_FILENO,"\x1b[500C\x1b[600B",12)!= 12)
@@ -177,8 +174,7 @@ int getWindowSize(int *rows, int *cols)//crap free
 		return 0;
 	}
 }
-void editorOpen(char *filename)
-{
+void editorOpen(char *filename){
 	free(E.file);
 	E.file=strdup(filename);
 
@@ -218,8 +214,7 @@ void editorSelectSyntaxHighlight() {
     }
   }
 }
-void processKeypress()//manages all the editor modes and special characters
-{
+void processKeypress(){//manages all the editor modes and special characters
 	static int quit_times=KILO_QUIT_TIMES;
 	int curr=readKey();
 	switch(curr){//add all the mode controls below
@@ -282,7 +277,7 @@ void processKeypress()//manages all the editor modes and special characters
 		case '\x1b':
 			break;
 		case ctrl('s'):
-		//	saveToFile();
+			saveToFile();
 			break;
 		default:
 			editorInsertChar(curr);
