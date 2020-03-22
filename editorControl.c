@@ -1,3 +1,7 @@
+/*
+	Author:Yashasvi Goel
+	Code Refactored on 21/3/20
+*/
 #include"editorControl.h"
 
 int editorRowCxToRx(erow *row, int cx) {//TODO  

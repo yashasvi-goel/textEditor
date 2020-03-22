@@ -1,3 +1,7 @@
+/*
+	Author:Yashasvi Goel
+	Code Refactored on 21/3/20
+*/
 #include "rawMode.h"
 
 void die(const char *s)//editorUtil
